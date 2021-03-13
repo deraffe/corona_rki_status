@@ -1,20 +1,49 @@
 #!/usr/bin/env python3
 import argparse
-import dataclasses
+import datetime
 import logging
+
+import pydantic
+import requests
 
 log = logging.getLogger(__name__)
 
-class Data:
-    def __init__(self, ags: str, data: dict):
-        self._ags = ags
-        self.data = data["data"][ags]
-        self.meta = data["meta"]
+API_BASE = 'https://api.corona-zahlen.org'
 
-    @property
-    def ags(self):
-        assert self.data["ags"] == self._ags
-        return self._ags
+
+class Delta(pydantic.BaseModel):
+    cases: int
+    deaths: int
+    recovered: int
+
+
+class Data(pydantic.BaseModel):
+    ags: str
+    name: str
+    county: str
+    population: int
+    cases: int
+    deaths: int
+    casesPerWeek: int
+    deathsPerWeek: int
+    recovered: int
+    weekIncidence: float
+    casesPer100k: float
+    delta: Delta
+
+
+class Meta(pydantic.BaseModel):
+    source: str
+    contact: str
+    info: str
+    lastUpdate: datetime.datetime
+    lastCheckedForUpdate: datetime.datetime
+
+
+class District(pydantic.BaseModel):
+    data: Data
+    meta: Meta
+
 
 # {
 #   "data": {
@@ -47,8 +76,12 @@ class Data:
 # }
 
 
-def get_data(ags: str) -> Data:
-    #
+def get_data(ags: str) -> District:
+    response = requests.get(f'{API_BASE}/districts/{ags}')
+    json = response.json()
+    data = Data(**json["data"][ags])
+    meta = Meta(**json["meta"])
+    return District(data=data, meta=meta)
 
 
 def main():
@@ -66,6 +99,7 @@ def main():
     logging.basicConfig(level=loglevel)
 
     data = get_data(args.ags)
+    print(data)
 
 
 if __name__ == '__main__':
