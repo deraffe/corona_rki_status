@@ -98,8 +98,10 @@ def main():
         raise ValueError('Invalid log level: {}'.format(args.loglevel))
     logging.basicConfig(level=loglevel)
 
-    data = get_data(args.ags)
-    print(data)
+    district = get_data(args.ags)
+    print(
+        f'{district.data.name}: {district.data.weekIncidence:.2f}/w/100k ({district.meta.lastUpdate:%d}.)'
+    )
 
 
 if __name__ == '__main__':
