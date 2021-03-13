@@ -45,43 +45,38 @@ class District(pydantic.BaseModel):
     meta: Meta
 
 
-# {
-#   "data": {
-#     "02000": {
-#       "ags": "02000",
-#       "name": "Hamburg",
-#       "county": "SK Hamburg",
-#       "population": 1847253,
-#       "cases": 37535,
-#       "deaths": 661,
-#       "casesPerWeek": 2027,
-#       "deathsPerWeek": 2,
-#       "recovered": 27864,
-#       "weekIncidence": 109.73050253538634,
-#       "casesPer100k": 2031.9360693960166,
-#       "delta": {
-#         "cases": 0,
-#         "deaths": 0,
-#         "recovered": 350
-#       }
-#     }
-#   },
-#   "meta": {
-#     "source": "Robert Koch-Institut",
-#     "contact": "Marlon Lueckert (m.lueckert@me.com)",
-#     "info": "https://github.com/marlon360/rki-covid-api",
-#     "lastUpdate": "2021-01-04T00:00:00.000Z",
-#     "lastCheckedForUpdate": "2021-01-04T13:59:49.832Z"
-#   }
-# }
+class HistoryItemIncidence(pydantic.BaseModel):
+    weekIncidence: float
+    date: datetime.datetime
 
 
-def get_data(ags: str) -> District:
+class HistoryIncidenceData(pydantic.BaseModel):
+    ags: str
+    name: str
+    history: list[HistoryItemIncidence]
+
+
+class HistoryIncidence(pydantic.BaseModel):
+    data: HistoryIncidenceData
+    meta: Meta
+
+
+def get_district(ags: str) -> District:
     response = requests.get(f'{API_BASE}/districts/{ags}')
     json = response.json()
     data = Data(**json["data"][ags])
     meta = Meta(**json["meta"])
     return District(data=data, meta=meta)
+
+
+def get_district_history(ags: str, days: int = 7) -> HistoryIncidence:
+    response = requests.get(
+        f'{API_BASE}/districts/{ags}/history/incidence/{days}'
+    )
+    json = response.json()
+    data = HistoryIncidenceData(**json["data"][ags])
+    meta = Meta(**json["meta"])
+    return HistoryIncidence(data=data, meta=meta)
 
 
 def main():
@@ -92,15 +87,23 @@ def main():
     parser.add_argument('ags', help='Allgemeiner Gemeinde Schlüssel')
     # Get it by searching through the big endpoint /districts
     # curl 'https://api.corona-zahlen.org/districts' | jq '.data[] | select(.name == "Mein Kreis")'
+    parser.add_argument(
+        '--days', help='How many days to go back', type=int, default=7
+    )
     args = parser.parse_args()
     loglevel = getattr(logging, args.loglevel.upper(), None)
     if not isinstance(loglevel, int):
         raise ValueError('Invalid log level: {}'.format(args.loglevel))
     logging.basicConfig(level=loglevel)
 
-    district = get_data(args.ags)
+    district = get_district(args.ags)
+    history = get_district_history(args.ags, args.days)
+    history_item_format = '{hi.date:%d}:{hi.weekIncidence:.2f} '
+    history_string = ''
+    for hi in history.data.history:
+        history_string += history_item_format.format(hi=hi)
     print(
-        f'{district.data.name}: {district.data.weekIncidence:.2f}/w/100k ({district.meta.lastUpdate:%d}.)'
+        f'{district.data.name}: {history_string}{district.meta.lastUpdate:%d}:{district.data.weekIncidence:.2f}'
     )
 
 
