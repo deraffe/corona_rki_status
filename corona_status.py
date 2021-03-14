@@ -99,15 +99,19 @@ def main():
 
     district = get_district(args.ags)
     history = get_district_history(args.ags, args.days)
-    history_item_format = '{hi.date:%d}:{hi.weekIncidence:.2f} '
-    history_string = ''
+    history_item_format = '{hi.date:%d}:{hi.weekIncidence:.1f}'
+    history_strings = []
     incidences = []
     for hi in history.data.history:
-        history_string += history_item_format.format(hi=hi)
+        history_strings.append(history_item_format.format(hi=hi))
         incidences.append(hi.weekIncidence)
+    incidences.append(district.data.weekIncidence)
     sparklinestr = sparkline.sparkify(incidences)
+    history_string = ''
+    for i, histr in enumerate(history_strings):
+        history_string += f'{histr}{sparklinestr[i]} '
     print(
-        f'{district.data.name}: {history_string}{district.meta.lastUpdate:%d}:{district.data.weekIncidence:.2f} {sparklinestr}'
+        f'{district.data.name}: {history_string}{district.meta.lastUpdate:%d}:{district.data.weekIncidence:.1f}{sparklinestr[-1]}'
     )
 
 
