@@ -5,6 +5,7 @@ import logging
 
 import pydantic
 import requests
+import sparkline
 
 log = logging.getLogger(__name__)
 
@@ -100,10 +101,13 @@ def main():
     history = get_district_history(args.ags, args.days)
     history_item_format = '{hi.date:%d}:{hi.weekIncidence:.2f} '
     history_string = ''
+    incidences = []
     for hi in history.data.history:
         history_string += history_item_format.format(hi=hi)
+        incidences.append(hi.weekIncidence)
+    sparklinestr = sparkline.sparkify(incidences)
     print(
-        f'{district.data.name}: {history_string}{district.meta.lastUpdate:%d}:{district.data.weekIncidence:.2f}'
+        f'{district.data.name}: {history_string}{district.meta.lastUpdate:%d}:{district.data.weekIncidence:.2f} {sparklinestr}'
     )
 
 

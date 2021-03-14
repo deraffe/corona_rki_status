@@ -8,6 +8,7 @@ authors = ["Your Name <you@example.com>"]
 python = "^3.9"
 requests = "^2.25.1"
 pydantic = "^1.8.1"
+pysparklines = "^1.0"
 
 [tool.poetry.dev-dependencies]
 
