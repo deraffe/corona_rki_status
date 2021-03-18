@@ -62,8 +62,18 @@ class HistoryIncidence(pydantic.BaseModel):
     meta: Meta
 
 
+def api_get(query: str) -> requests.Response:
+    response = requests.get(f'{API_BASE}{query}')
+    json = response.json()
+    if not response.status_code == requests.codes.ok:
+        raise RuntimeError(json)
+    if 'error' in json:
+        raise RuntimeError(json['error'].get('message'), json)
+    return response
+
+
 def get_district(ags: str) -> District:
-    response = requests.get(f'{API_BASE}/districts/{ags}')
+    response = api_get(f'/districts/{ags}')
     json = response.json()
     data = Data(**json["data"][ags])
     meta = Meta(**json["meta"])
@@ -71,9 +81,7 @@ def get_district(ags: str) -> District:
 
 
 def get_district_history(ags: str, days: int = 7) -> HistoryIncidence:
-    response = requests.get(
-        f'{API_BASE}/districts/{ags}/history/incidence/{days}'
-    )
+    response = api_get(f'/districts/{ags}/history/incidence/{days}')
     json = response.json()
     data = HistoryIncidenceData(**json["data"][ags])
     meta = Meta(**json["meta"])
