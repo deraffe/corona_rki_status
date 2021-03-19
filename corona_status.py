@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import datetime
+import functools
 import logging
 
 import pydantic
@@ -62,6 +63,19 @@ class HistoryIncidence(pydantic.BaseModel):
     meta: Meta
 
 
+def cache(*cargs):
+
+    def set_cache(fn):
+
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            return fn(*args, **kwargs)
+
+        return wrapper
+
+    return set_cache
+
+
 def api_get(query: str) -> requests.Response:
     response = requests.get(f'{API_BASE}{query}')
     json = response.json()
@@ -72,6 +86,7 @@ def api_get(query: str) -> requests.Response:
     return response
 
 
+@cache(datetime.timedelta(hours=6), lambda d: d.meta.lastCheckedForUpdate)
 def get_district(ags: str) -> District:
     response = api_get(f'/districts/{ags}')
     json = response.json()
@@ -80,6 +95,7 @@ def get_district(ags: str) -> District:
     return District(data=data, meta=meta)
 
 
+@cache(datetime.timedelta(hours=6), lambda d: d.meta.lastCheckedForUpdate)
 def get_district_history(ags: str, days: int = 7) -> HistoryIncidence:
     response = api_get(f'/districts/{ags}/history/incidence/{days}')
     json = response.json()
