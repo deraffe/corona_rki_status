@@ -6,6 +6,7 @@ import logging
 import os
 import pathlib
 import pickle
+from typing import Callable, Iterable, Optional
 
 import pydantic
 import requests
@@ -67,7 +68,18 @@ class HistoryIncidence(pydantic.BaseModel):
 
 
 def cache(*cargs):
-    valid_for, get_timestamp = cargs
+    valid_for: datetime.datetime
+    get_timestamp: Callable
+    catch_exceptions: Optional[Iterable[Exception]]
+    if len(cargs) == 2:
+        valid_for, get_timestamp = cargs
+        catch_exceptions = None
+    elif len(cargs) == 3:
+        valid_for, get_timestamp, catch_exceptions = cargs
+    else:
+        raise ValueError('cache(valid_for: datetime.datetime, get_timestamp: Callable, catch_exceptions: Optional[Iterable[Exception]] = None)')
+
+
 
     def set_cache(fn):
 
@@ -80,15 +92,20 @@ def cache(*cargs):
 
         @functools.wraps(fn)
         def cache_wrapper(*args, **kwargs):
+            nonlocal valid_for, get_timestamp, catch_exceptions
             with cache_file.open('r+b') as cachef:
-                try:  # FIXME check if cache_file has contents
-                    cache = pickle.load(cachef)
+                try:
+                    cache_storage = pickle.load(cachef)
                     cachef.seek(0)
                 except (FileNotFoundError, EOFError):
-                    cache = {}
+                    cache_storage = {}
                 cache_key = (fn.__name__, args, tuple(kwargs))
-                current_timestamp = datetime.datetime.now(datetime.timezone.utc)
-                cache_timestamp, result = cache.get(cache_key, (None, None))
+                current_timestamp = datetime.datetime.now(
+                    datetime.timezone.utc
+                )
+                cache_timestamp, result = cache_storage.get(
+                    cache_key, (None, None)
+                )
                 log.debug(f"{current_timestamp=} {cache_timestamp=}")
                 if cache_timestamp is None or (
                     current_timestamp - cache_timestamp
@@ -96,15 +113,28 @@ def cache(*cargs):
                     log.debug(
                         f"cache_timestamp invalid or too old: {cache_timestamp}"
                     )
-                    result = fn(*args, **kwargs)
-                    data_timestamp = get_timestamp(result)
+                    if catch_exceptions is None:
+                        catch_exceptions = tuple()
+                    try:
+                        result = fn(*args, **kwargs)
+                    except catch_exceptions as e:
+                        log.warn(
+                            f'Caught exception (re-using cached result): {e}'
+                        )
+                        if cache_timestamp is None:
+                            raise ValueError(
+                                "Caught exception, but couldn't find cached value"
+                            ) from e
+                        data_timestamp = cache_timestamp
+                    else:
+                        data_timestamp = get_timestamp(result)
                     log.debug(
                         f"Saving result to cache with timestamp {data_timestamp}"
                     )
-                    cache[cache_key] = (data_timestamp, result)
+                    cache_storage[cache_key] = (data_timestamp, result)
                 else:
                     log.debug(f"Using cached data from {cache_timestamp}")
-                pickle.dump(cache, cachef)
+                pickle.dump(cache_storage, cachef)
                 return result
 
         return cache_wrapper
@@ -122,7 +152,7 @@ def api_get(query: str) -> requests.Response:
     return response
 
 
-@cache(datetime.timedelta(hours=6), lambda d: d.meta.lastCheckedForUpdate)
+@cache(datetime.timedelta(hours=6), lambda d: d.meta.lastCheckedForUpdate, (RuntimeError,))
 def get_district(ags: str) -> District:
     response = api_get(f'/districts/{ags}')
     json = response.json()
@@ -131,7 +161,7 @@ def get_district(ags: str) -> District:
     return District(data=data, meta=meta)
 
 
-@cache(datetime.timedelta(hours=6), lambda d: d.meta.lastCheckedForUpdate)
+@cache(datetime.timedelta(hours=6), lambda d: d.meta.lastCheckedForUpdate, (RuntimeError,))
 def get_district_history(ags: str, days: int = 7) -> HistoryIncidence:
     response = api_get(f'/districts/{ags}/history/incidence/{days}')
     json = response.json()
@@ -151,11 +181,7 @@ def main():
     parser.add_argument(
         '--days', help='How many days to go back', type=int, default=7
     )
-    parser.add_argument(
-        '--cache-file',
-        type=pathlib.Path,
-        help="Cache file"
-    )
+    parser.add_argument('--cache-file', type=pathlib.Path, help="Cache file")
     args = parser.parse_args()
     loglevel = getattr(logging, args.loglevel.upper(), None)
     if not isinstance(loglevel, int):
