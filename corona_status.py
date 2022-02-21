@@ -3,6 +3,9 @@ import argparse
 import datetime
 import functools
 import logging
+import os
+import pathlib
+import pickle
 
 import pydantic
 import requests
@@ -64,14 +67,47 @@ class HistoryIncidence(pydantic.BaseModel):
 
 
 def cache(*cargs):
+    valid_for, get_timestamp = cargs
 
     def set_cache(fn):
 
-        @functools.wraps(fn)
-        def wrapper(*args, **kwargs):
-            return fn(*args, **kwargs)
+        cache_file = pathlib.Path(
+            os.environb.get(
+                b'CORONA_STATUS_CACHE',
+                pathlib.Path(__file__).parent.resolve() / 'corona_status.cache'
+            )
+        )
 
-        return wrapper
+        @functools.wraps(fn)
+        def cache_wrapper(*args, **kwargs):
+            with cache_file.open('r+b') as cachef:
+                try:  # FIXME check if cache_file has contents
+                    cache = pickle.load(cachef)
+                    cachef.seek(0)
+                except (FileNotFoundError, EOFError):
+                    cache = {}
+                cache_key = (fn.__name__, args, tuple(kwargs))
+                current_timestamp = datetime.datetime.now(datetime.timezone.utc)
+                cache_timestamp, result = cache.get(cache_key, (None, None))
+                log.debug(f"{current_timestamp=} {cache_timestamp=}")
+                if cache_timestamp is None or (
+                    current_timestamp - cache_timestamp
+                ) >= valid_for:
+                    log.debug(
+                        f"cache_timestamp invalid or too old: {cache_timestamp}"
+                    )
+                    result = fn(*args, **kwargs)
+                    data_timestamp = get_timestamp(result)
+                    log.debug(
+                        f"Saving result to cache with timestamp {data_timestamp}"
+                    )
+                    cache[cache_key] = (data_timestamp, result)
+                else:
+                    log.debug(f"Using cached data from {cache_timestamp}")
+                pickle.dump(cache, cachef)
+                return result
+
+        return cache_wrapper
 
     return set_cache
 
@@ -114,6 +150,11 @@ def main():
     # curl 'https://api.corona-zahlen.org/districts' | jq '.data[] | select(.name == "Mein Kreis")'
     parser.add_argument(
         '--days', help='How many days to go back', type=int, default=7
+    )
+    parser.add_argument(
+        '--cache-file',
+        type=pathlib.Path,
+        help="Cache file"
     )
     args = parser.parse_args()
     loglevel = getattr(logging, args.loglevel.upper(), None)
