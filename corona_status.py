@@ -212,13 +212,9 @@ def main():
     history_strings = history_strings[non_full_days:]
     incidences.append(district.data.weekIncidence)
     sparklinestr = sparkline.sparkify(incidences)
-    spark_prefix = sparklinestr[:non_full_days]
-    sparklinestr = sparklinestr[non_full_days:]
-    history_string = ''
-    for i, histr in enumerate(history_strings):
-        history_string += f'{histr}{sparklinestr[i]} '
+    history_string = ' '.join(history_strings)
     print(
-        f'{district.data.name}: {spark_prefix} {history_string}{district.meta.lastUpdate:%d}:{district.data.weekIncidence:04.1f}{sparklinestr[-1]}'
+        f'{district.data.name}: {sparklinestr} {history_string} {district.meta.lastUpdate:%d}:{district.data.weekIncidence:04.1f}'
     )
 
 
