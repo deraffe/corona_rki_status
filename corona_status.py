@@ -77,9 +77,9 @@ def cache(*cargs):
     elif len(cargs) == 3:
         valid_for, get_timestamp, catch_exceptions = cargs
     else:
-        raise ValueError('cache(valid_for: datetime.datetime, get_timestamp: Callable, catch_exceptions: Optional[Iterable[Exception]] = None)')
-
-
+        raise ValueError(
+            'cache(valid_for: datetime.datetime, get_timestamp: Callable, catch_exceptions: Optional[Iterable[Exception]] = None)'
+        )
 
     def set_cache(fn):
 
@@ -152,7 +152,10 @@ def api_get(query: str) -> requests.Response:
     return response
 
 
-@cache(datetime.timedelta(hours=6), lambda d: d.meta.lastCheckedForUpdate, (RuntimeError,))
+@cache(
+    datetime.timedelta(hours=6), lambda d: d.meta.lastCheckedForUpdate,
+    (RuntimeError, )
+)
 def get_district(ags: str) -> District:
     response = api_get(f'/districts/{ags}')
     json = response.json()
@@ -161,7 +164,10 @@ def get_district(ags: str) -> District:
     return District(data=data, meta=meta)
 
 
-@cache(datetime.timedelta(hours=6), lambda d: d.meta.lastCheckedForUpdate, (RuntimeError,))
+@cache(
+    datetime.timedelta(hours=6), lambda d: d.meta.lastCheckedForUpdate,
+    (RuntimeError, )
+)
 def get_district_history(ags: str, days: int = 7) -> HistoryIncidence:
     response = api_get(f'/districts/{ags}/history/incidence/{days}')
     json = response.json()
@@ -179,7 +185,8 @@ def main():
     # Get it by searching through the big endpoint /districts
     # curl 'https://api.corona-zahlen.org/districts' | jq '.data[] | select(.name == "Mein Kreis")'
     parser.add_argument(
-        '--days', help='How many days to go back', type=int, default=7
+        '--days', help='How many days to go back', type=int, default=14
+    )
     )
     parser.add_argument('--cache-file', type=pathlib.Path, help="Cache file")
     args = parser.parse_args()
