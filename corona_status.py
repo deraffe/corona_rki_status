@@ -187,6 +187,11 @@ def main():
     parser.add_argument(
         '--days', help='How many days to go back', type=int, default=14
     )
+    parser.add_argument(
+        '--full-days',
+        help='How many days to show with values',
+        type=int,
+        default=6
     )
     parser.add_argument('--cache-file', type=pathlib.Path, help="Cache file")
     args = parser.parse_args()
@@ -195,6 +200,7 @@ def main():
         raise ValueError('Invalid log level: {}'.format(args.loglevel))
     logging.basicConfig(level=loglevel)
 
+    non_full_days = args.days - args.full_days
     district = get_district(args.ags)
     history = get_district_history(args.ags, args.days)
     history_item_format = '{hi.date:%d}:{hi.weekIncidence:04.1f}'
@@ -203,13 +209,16 @@ def main():
     for hi in history.data.history:
         history_strings.append(history_item_format.format(hi=hi))
         incidences.append(hi.weekIncidence)
+    history_strings = history_strings[non_full_days:]
     incidences.append(district.data.weekIncidence)
     sparklinestr = sparkline.sparkify(incidences)
+    spark_prefix = sparklinestr[:non_full_days]
+    sparklinestr = sparklinestr[non_full_days:]
     history_string = ''
     for i, histr in enumerate(history_strings):
         history_string += f'{histr}{sparklinestr[i]} '
     print(
-        f'{district.data.name}: {history_string}{district.meta.lastUpdate:%d}:{district.data.weekIncidence:04.1f}{sparklinestr[-1]}'
+        f'{district.data.name}: {spark_prefix} {history_string}{district.meta.lastUpdate:%d}:{district.data.weekIncidence:04.1f}{sparklinestr[-1]}'
     )
 
 
