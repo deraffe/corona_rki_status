@@ -213,8 +213,9 @@ def main():
     incidences.append(district.data.weekIncidence)
     sparklinestr = sparkline.sparkify(incidences)
     history_string = ' '.join(history_strings)
+    cases_per_incidence_level = district.data.population / 100000
     print(
-        f'{district.data.name}: {sparklinestr} {history_string} {district.meta.lastUpdate:%d}:{district.data.weekIncidence:04.1f}'
+        f'{district.data.name}({cases_per_incidence_level:.2f}): {sparklinestr} {history_string} {district.meta.lastUpdate:%d}:{district.data.weekIncidence:04.1f}'
     )
 
 
