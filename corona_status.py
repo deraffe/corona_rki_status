@@ -220,6 +220,8 @@ def cmd_draw(args):
         scaled_value = value_in_target_scale + target_min
         return scaled_value
 
+    width, height = drawille.getTerminalSize()
+
     first_day = None
     max_seconds = 0
     get_seconds = lambda td: td.total_seconds()
@@ -229,7 +231,6 @@ def cmd_draw(args):
         max_seconds = max(max_seconds, get_seconds(day.date - first_day))
 
     def scale_day(value: int) -> float:
-        width, height = drawille.getTerminalSize()
         return scale(0, width, 0, max_seconds, value)
 
     min_incidence = 700000
@@ -239,7 +240,6 @@ def cmd_draw(args):
         min_incidence = min(min_incidence, day.weekIncidence)
 
     def scale_incidence(value: float) -> float:
-        width, height = drawille.getTerminalSize()
         return scale(0, height, min_incidence, max_incidence, value)
 
     c = drawille.Canvas()
