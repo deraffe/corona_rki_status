@@ -249,11 +249,18 @@ def cmd_draw(args):
         return scale(0, height, min_incidence, max_incidence, value, flip=flip)
 
     c = drawille.Canvas()
+    prev_x = None
+    prev_y = None
     for day in history:
-        c.set(
-            scale_day(get_seconds(day.date - first_day)),
-            scale_incidence(day.weekIncidence, flip=True)
-        )
+        x = scale_day(get_seconds(day.date - first_day))
+        y = scale_incidence(day.weekIncidence, flip=True)
+        if prev_x == None:
+            c.set(x, y)
+        else:
+            for line_x, line_y in drawille.line(prev_x, prev_y, x, y):
+                c.set(line_x, line_y)
+        prev_x = x
+        prev_y = y
     print(c.frame())
 
 
