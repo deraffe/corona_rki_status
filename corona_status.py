@@ -244,7 +244,6 @@ def cmd_draw(args):
 
     c = drawille.Canvas()
     for day in history:
-        c.set(day.weekIncidence, day.date.day)
         c.set(
             scale_day(get_seconds(day.date - first_day)),
             scale_incidence(day.weekIncidence)
