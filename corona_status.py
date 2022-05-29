@@ -208,11 +208,47 @@ def cmd_draw(args):
         )
         sys.exit(1)
 
-    history = get_district_history(args.ags, args.days)
+    history = get_district_history(args.ags, args.days).data.history
+
+    def scale(
+        target_min: float | int, target_max: float | int,
+        value_min: float | int, value_max: float | int, value: float | int
+    ) -> float:
+        value_in_scale = value - value_min
+        percentage = value_in_scale / (value_max - value_min)
+        value_in_target_scale = percentage * (target_max - target_min)
+        scaled_value = value_in_target_scale + target_min
+        return scaled_value
+
+    first_day = None
+    max_seconds = 0
+    get_seconds = lambda td: td.total_seconds()
+    for index, day in enumerate(history):
+        if index == 0:
+            first_day = day.date
+        max_seconds = max(max_seconds, get_seconds(day.date - first_day))
+
+    def scale_day(value: int) -> float:
+        width, height = drawille.getTerminalSize()
+        return scale(0, width, 0, max_seconds, value)
+
+    min_incidence = 700000
+    max_incidence = 0
+    for day in history:
+        max_incidence = max(max_incidence, day.weekIncidence)
+        min_incidence = min(min_incidence, day.weekIncidence)
+
+    def scale_incidence(value: float) -> float:
+        width, height = drawille.getTerminalSize()
+        return scale(0, height, min_incidence, max_incidence, value)
 
     c = drawille.Canvas()
-    for day in history.data.history:
-        c.set(day.date.day, day.weekIncidence)
+    for day in history:
+        c.set(day.weekIncidence, day.date.day)
+        c.set(
+            scale_day(get_seconds(day.date - first_day)),
+            scale_incidence(day.weekIncidence)
+        )
     print(c.frame())
 
 
