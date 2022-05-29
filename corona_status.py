@@ -211,11 +211,17 @@ def cmd_draw(args):
     history = get_district_history(args.ags, args.days).data.history
 
     def scale(
-        target_min: float | int, target_max: float | int,
-        value_min: float | int, value_max: float | int, value: float | int
+        target_min: float | int,
+        target_max: float | int,
+        value_min: float | int,
+        value_max: float | int,
+        value: float | int,
+        flip=False
     ) -> float:
         value_in_scale = value - value_min
         percentage = value_in_scale / (value_max - value_min)
+        if flip:
+            percentage = 1 - percentage
         value_in_target_scale = percentage * (target_max - target_min)
         scaled_value = value_in_target_scale + target_min
         return scaled_value
@@ -239,14 +245,14 @@ def cmd_draw(args):
         max_incidence = max(max_incidence, day.weekIncidence)
         min_incidence = min(min_incidence, day.weekIncidence)
 
-    def scale_incidence(value: float) -> float:
-        return scale(0, height, min_incidence, max_incidence, value)
+    def scale_incidence(value: float, flip=False) -> float:
+        return scale(0, height, min_incidence, max_incidence, value, flip=flip)
 
     c = drawille.Canvas()
     for day in history:
         c.set(
             scale_day(get_seconds(day.date - first_day)),
-            scale_incidence(day.weekIncidence)
+            scale_incidence(day.weekIncidence, flip=True)
         )
     print(c.frame())
 
