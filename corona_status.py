@@ -176,6 +176,46 @@ def get_district_history(ags: str, days: int = 7) -> HistoryIncidence:
     return HistoryIncidence(data=data, meta=meta)
 
 
+def cmd_print(args):
+    non_full_days = args.days - args.full_days
+    district = get_district(args.ags)
+    history = get_district_history(args.ags, args.days)
+
+    history_item_format = '{hi.date:%d}:{hi.weekIncidence:04.1f}'
+    history_strings = []
+    incidences = []
+    for hi in history.data.history:
+        history_strings.append(history_item_format.format(hi=hi))
+        incidences.append(hi.weekIncidence)
+    history_strings = history_strings[non_full_days:]
+    incidences.append(district.data.weekIncidence)
+    sparklinestr = sparkline.sparkify(incidences)
+    history_string = ' '.join(history_strings)
+    cases_per_incidence_level = district.data.population / 100000
+    print(
+        f'{district.data.name}({cases_per_incidence_level:.2f}): {sparklinestr} {history_string} {district.meta.lastUpdate:%d}:{district.data.weekIncidence:04.1f}'
+    )
+
+
+def cmd_draw(args):
+    try:
+        import sys
+
+        import drawille
+    except ImportError:
+        log.error(
+            'Please install the extra dependencies under "graph" to use this feature.'
+        )
+        sys.exit(1)
+
+    history = get_district_history(args.ags, args.days)
+
+    c = drawille.Canvas()
+    for day in history.data.history:
+        c.set(day.date.day, day.weekIncidence)
+    print(c.frame())
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -194,29 +234,21 @@ def main():
         default=6
     )
     parser.add_argument('--cache-file', type=pathlib.Path, help="Cache file")
+    parser.add_argument(
+        '--draw',
+        action='store_true',
+        help='Draw incidence instead of using sparklines'
+    )
     args = parser.parse_args()
     loglevel = getattr(logging, args.loglevel.upper(), None)
     if not isinstance(loglevel, int):
         raise ValueError('Invalid log level: {}'.format(args.loglevel))
     logging.basicConfig(level=loglevel)
 
-    non_full_days = args.days - args.full_days
-    district = get_district(args.ags)
-    history = get_district_history(args.ags, args.days)
-    history_item_format = '{hi.date:%d}:{hi.weekIncidence:04.1f}'
-    history_strings = []
-    incidences = []
-    for hi in history.data.history:
-        history_strings.append(history_item_format.format(hi=hi))
-        incidences.append(hi.weekIncidence)
-    history_strings = history_strings[non_full_days:]
-    incidences.append(district.data.weekIncidence)
-    sparklinestr = sparkline.sparkify(incidences)
-    history_string = ' '.join(history_strings)
-    cases_per_incidence_level = district.data.population / 100000
-    print(
-        f'{district.data.name}({cases_per_incidence_level:.2f}): {sparklinestr} {history_string} {district.meta.lastUpdate:%d}:{district.data.weekIncidence:04.1f}'
-    )
+    if args.draw:
+        cmd_draw(args)
+    else:
+        cmd_print(args)
 
 
 if __name__ == '__main__':
