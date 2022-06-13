@@ -188,12 +188,11 @@ def cmd_print(args):
         history_strings.append(history_item_format.format(hi=hi))
         incidences.append(hi.weekIncidence)
     history_strings = history_strings[non_full_days:]
-    incidences.append(district.data.weekIncidence)
     sparklinestr = sparkline.sparkify(incidences)
     history_string = ' '.join(history_strings)
     cases_per_incidence_level = district.data.population / 100000
     print(
-        f'{district.data.name}({cases_per_incidence_level:.2f}): {sparklinestr} {history_string} {district.meta.lastUpdate:%d}:{district.data.weekIncidence:04.1f}'
+        f'{district.data.name}({cases_per_incidence_level:.2f}): {sparklinestr} {history_string}'
     )
 
 
@@ -279,7 +278,7 @@ def main():
         '--full-days',
         help='How many days to show with values',
         type=int,
-        default=6
+        default=7
     )
     parser.add_argument('--cache-file', type=pathlib.Path, help="Cache file")
     parser.add_argument(
