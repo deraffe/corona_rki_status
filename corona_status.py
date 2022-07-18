@@ -93,6 +93,8 @@ def cache(*cargs):
         @functools.wraps(fn)
         def cache_wrapper(*args, **kwargs):
             nonlocal valid_for, get_timestamp, catch_exceptions
+            if not cache_file.exists():
+                cache_file.touch()
             with cache_file.open('r+b') as cachef:
                 try:
                     cache_storage = pickle.load(cachef)
