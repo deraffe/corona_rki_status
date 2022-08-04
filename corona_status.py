@@ -6,7 +6,7 @@ import logging
 import os
 import pathlib
 import pickle
-from typing import Any, Callable, Iterable, Optional, TypeVar, Union, cast
+from typing import Callable, Iterable, Optional, TypeVar, Union, cast
 
 import pydantic
 import requests
@@ -225,14 +225,25 @@ def get_district_history(ags: str, days: int = 7, attribute: str = 'incidence') 
 def cmd_print(args):
     non_full_days = args.days - args.full_days
     district = get_district(args.ags)
-    history = get_district_history_incidence(args.ags, args.days)
+    history = get_district_history(args.ags, args.days, args.attribute)
 
-    history_item_format = '{hi.date:%d}:{hi.weekIncidence:04.1f}'
+    def get_attribute_name() -> str:
+        match args.attribute:
+            case 'incidence':
+                attribute_name = 'weekIncidence'
+            case _:
+                attribute_name = args.attribute
+        return attribute_name
+
+    def get_attribute(history_item):
+        return getattr(history_item, get_attribute_name())
+
+    history_item_format = '{hi.date:%d}:{hi.' + get_attribute_name() + ':03.0f}'
     history_strings = []
     incidences = []
     for hi in history.data.history:
         history_strings.append(history_item_format.format(hi=hi))
-        incidences.append(hi.weekIncidence)
+        incidences.append(get_attribute(hi))
     history_strings = history_strings[non_full_days:]
     sparklinestr = sparkline.sparkify(incidences)
     history_string = ' '.join(history_strings)
@@ -253,7 +264,16 @@ def cmd_draw(args):
         )
         sys.exit(1)
 
-    history = get_district_history_incidence(args.ags, args.days).data.history
+    history = get_district_history(args.ags, args.days, args.attribute).data.history
+
+    def get_attribute(history_item):
+        match args.attribute:
+            case 'incidence':
+                attribute_name = 'weekIncidence'
+            case _:
+                attribute_name = args.attribute
+
+        return getattr(history_item, attribute_name)
 
     def scale(
         target_min: float | int,
@@ -275,7 +295,10 @@ def cmd_draw(args):
 
     first_day = None
     max_seconds = 0
-    get_seconds = lambda td: td.total_seconds()
+
+    def get_seconds(td: datetime.timedelta) -> float:
+        return td.total_seconds()
+
     for index, day in enumerate(history):
         if index == 0:
             first_day = day.date
@@ -284,22 +307,22 @@ def cmd_draw(args):
     def scale_day(value: int) -> float:
         return scale(0, width, 0, max_seconds, value)
 
-    min_incidence = 700000
-    max_incidence = 0
+    min_attribute = 700000
+    max_attribute = 0
     for day in history:
-        max_incidence = max(max_incidence, day.weekIncidence)
-        min_incidence = min(min_incidence, day.weekIncidence)
+        max_attribute = max(max_attribute, get_attribute(day))
+        min_attribute = min(min_attribute, get_attribute(day))
 
     def scale_incidence(value: float, flip=False) -> float:
-        return scale(0, height, min_incidence, max_incidence, value, flip=flip)
+        return scale(0, height, min_attribute, max_attribute, value, flip=flip)
 
     c = drawille.Canvas()
     prev_x = None
     prev_y = None
     for day in history:
         x = scale_day(get_seconds(day.date - first_day))
-        y = scale_incidence(day.weekIncidence, flip=True)
-        if prev_x == None:
+        y = scale_incidence(get_attribute(day), flip=True)
+        if prev_x is None:
             c.set(x, y)
         else:
             for line_x, line_y in drawille.line(prev_x, prev_y, x, y):
@@ -332,6 +355,7 @@ def main():
         action='store_true',
         help='Draw incidence instead of using sparklines'
     )
+    parser.add_argument('--attribute', type=str, default='incidence', choices=('incidence', 'cases'), help='Choose attribute to query')
     args = parser.parse_args()
     loglevel = getattr(logging, args.loglevel.upper(), None)
     if not isinstance(loglevel, int):
