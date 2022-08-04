@@ -102,9 +102,10 @@ def cache(*cargs) -> Callable[[F], F]:
 
     def set_cache(fn: F) -> F:
 
+        # Yes, POSIX paths are bytes, but `pathlib.Path`s are strings.
         cache_file = pathlib.Path(
-            os.environb.get(
-                b'CORONA_STATUS_CACHE',
+            os.environ.get(
+                'CORONA_STATUS_CACHE',
                 pathlib.Path(__file__).parent.resolve() / 'corona_status.cache'
             )
         )
