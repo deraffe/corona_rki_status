@@ -6,7 +6,7 @@ import logging
 import os
 import pathlib
 import pickle
-from typing import Callable, Iterable, Optional
+from typing import Callable, Iterable, Optional, Union
 
 import pydantic
 import requests
@@ -65,6 +65,25 @@ class HistoryIncidenceData(pydantic.BaseModel):
 class HistoryIncidence(pydantic.BaseModel):
     data: HistoryIncidenceData
     meta: Meta
+
+
+class HistoryItemCases(pydantic.BaseModel):
+    cases: int
+    date: datetime.datetime
+
+
+class HistoryCasesData(pydantic.BaseModel):
+    ags: str
+    name: str
+    history: list[HistoryItemCases]
+
+
+class HistoryCases(pydantic.BaseModel):
+    data: HistoryCasesData
+    meta: Meta
+
+
+History = Union[HistoryIncidence, HistoryCases]
 
 
 def cache(*cargs):
@@ -170,18 +189,41 @@ def get_district(ags: str) -> District:
     datetime.timedelta(hours=6), lambda d: d.meta.lastCheckedForUpdate,
     (RuntimeError, )
 )
-def get_district_history(ags: str, days: int = 7) -> HistoryIncidence:
+def get_district_history_incidence(
+    ags: str, days: int = 7
+) -> HistoryIncidence:
     response = api_get(f'/districts/{ags}/history/incidence/{days}')
     json = response.json()
     data = HistoryIncidenceData(**json["data"][ags])
     meta = Meta(**json["meta"])
     return HistoryIncidence(data=data, meta=meta)
 
+@cache(
+    datetime.timedelta(hours=6), lambda d: d.meta.lastCheckedForUpdate,
+    (RuntimeError, )
+)
+def get_district_history_cases(
+    ags: str, days: int = 7
+) -> HistoryCases:
+    response = api_get(f'/districts/{ags}/history/cases/{days}')
+    json = response.json()
+    data = HistoryCasesData(**json["data"][ags])
+    meta = Meta(**json["meta"])
+    return HistoryCases(data=data, meta=meta)
+
+def get_district_history(ags: str, days: int = 7, attribute: str = 'incidence') -> History:
+    match attribute:
+        case 'incidence':
+            return get_district_history_incidence(ags, days)
+        case 'cases':
+            return get_district_history_cases(ags, days)
+        case _:
+            raise NotImplementedError(f'Unkown attribute {attribute}')
 
 def cmd_print(args):
     non_full_days = args.days - args.full_days
     district = get_district(args.ags)
-    history = get_district_history(args.ags, args.days)
+    history = get_district_history_incidence(args.ags, args.days)
 
     history_item_format = '{hi.date:%d}:{hi.weekIncidence:04.1f}'
     history_strings = []
@@ -209,7 +251,7 @@ def cmd_draw(args):
         )
         sys.exit(1)
 
-    history = get_district_history(args.ags, args.days).data.history
+    history = get_district_history_incidence(args.ags, args.days).data.history
 
     def scale(
         target_min: float | int,
