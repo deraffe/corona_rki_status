@@ -6,7 +6,7 @@ import logging
 import os
 import pathlib
 import pickle
-from typing import Callable, Iterable, Optional, Union
+from typing import Any, Callable, Iterable, Optional, TypeVar, Union, cast
 
 import pydantic
 import requests
@@ -84,9 +84,9 @@ class HistoryCases(pydantic.BaseModel):
 
 
 History = Union[HistoryIncidence, HistoryCases]
+F = TypeVar('F', bound=Callable)
 
-
-def cache(*cargs):
+def cache(*cargs) -> Callable[[F], F]:
     valid_for: datetime.datetime
     get_timestamp: Callable
     catch_exceptions: Optional[Iterable[Exception]]
@@ -100,7 +100,7 @@ def cache(*cargs):
             'cache(valid_for: datetime.datetime, get_timestamp: Callable, catch_exceptions: Optional[Iterable[Exception]] = None)'
         )
 
-    def set_cache(fn):
+    def set_cache(fn: F) -> F:
 
         cache_file = pathlib.Path(
             os.environb.get(
@@ -158,7 +158,7 @@ def cache(*cargs):
                 pickle.dump(cache_storage, cachef)
                 return result
 
-        return cache_wrapper
+        return cast(F, cache_wrapper)
 
     return set_cache
 
@@ -197,6 +197,7 @@ def get_district_history_incidence(
     data = HistoryIncidenceData(**json["data"][ags])
     meta = Meta(**json["meta"])
     return HistoryIncidence(data=data, meta=meta)
+
 
 @cache(
     datetime.timedelta(hours=6), lambda d: d.meta.lastCheckedForUpdate,
